@@ -4,13 +4,15 @@ Azul is a two-way synchronization tool between Roblox Studio and your local file
 
 Azul allows you to use professional-grade tools like Visual Studio Code in Roblox development.
 
-Yes, the name is a pun on "Rojo" (Azul is Spanish for "blue").
+_Yes, the name is a pun on Rojo (Spanish for "red"). Azul means "blue"!_
 
 <a href="#quick-start"><b>Quick Start</b></a> — <a href="#why-azul"><b>Why Azul</b></a> — <a href="#configuration"><b>Configuration</b></a>
 
 ## Philosophy
 
 Unlike Rojo, Azul treats **Studio as the source of truth.** The local filesystem mirrors what's in Studio, not the other way around.
+
+When you do need to seed Studio from local files, run the one-time `azul build` command; after that, the regular sync loop continues to treat Studio as primary.
 
 ## Features
 
@@ -19,11 +21,10 @@ Unlike Rojo, Azul treats **Studio as the source of truth.** The local filesystem
 - - [x] 🌳 **DataModel mirroring**: Instance hierarchy mapped to folder structure
 - - [x] 🔌 **Real-time WebSocket communication**: Instant synchronization
 - - [x] 🎯 **No manual configuration**: Works out of the box with new and existing projects.
+- - [x] 🏗️ **Build command**: `azul build` seeds Studio from your filesystem (creates/overwrites, no deletes)
 
 ### Planned features
 
-- - [ ] 🍳 **Easy Plugin Configuration:** Interface for configuring the Studio Plugin.
-- - [ ] 🏗️ **Build command:** `azul build` command to build from local files _(one-time filesystem -> Studio push)_
 - - [ ] 📦 **Package Manager Integration**: Allow seamless sync of packages installed via package managers (i.e Wally).
 
 ## Why Azul?
@@ -41,6 +42,7 @@ I won't deny that Rojo is a great tool for many power users, but for me, it ofte
 I believe Script Sync is a great step forward from Roblox but, in the way it has been described, Azul offers several advantages:
 
 - **Script Sync does not mirror the entire DataModel structure**: It only mirrors selected folders or Scripts, not the whole DataModel (Explorer).
+- **Truly bi-directional**: Azul allows you to sync changes made in the filesystem back to Studio using the `azul build` command.
 - **Generates a Rojo-compatible `sourcemap.json`**: This allows any tooling that require Rojo-style sourcemaps _(like luau-lsp)_ to work seamlessly.
 - **You can use it today!**: Unlike Rojo, Azul requires no commitment to a specific project structure. If want to try out Script Sync in the future, you can do so without any worries.
 
@@ -87,6 +89,7 @@ I believe Script Sync is a great step forward from Roblox but, in the way it has
 - Converts instances to filesystem structure
 - Watches local files for changes
 - Generates Rojo-compatible sourcemap.json
+- Build mode scans your sync directory and sends a snapshot to Studio (create/overwrite only: no deletes)
 
 ### Studio Plugin (Luau)
 
@@ -113,9 +116,6 @@ Nested instances are represented as a new folder besides the parent Script. For 
   - `sync\ServerScriptService\Game\ParentScript.server.luau`
   - `sync\ServerScriptService\Game\ParentScript\NestedScript.server.luau`
 
-> [!WARNING]
-> It is heavily advised to avoid nesting Scripts inside other Scripts due to potential confusion and complexity.
-
 ### Script Types
 
 Script types are indicated by suffixes:
@@ -123,6 +123,13 @@ Script types are indicated by suffixes:
 - `.server.luau` for `Script`
 - `.client.luau` for `LocalScript`
 - `.module.luau` for `ModuleScript`
+- No suffix defaults to `ModuleScript`
+
+## Build Command
+
+- **What it does:** Pushes your sync directory into Studio once, creating missing folders/scripts and overwriting matching scripts. Extra Studio instances are left untouched.
+- **When to use:** Bootstrapping a new project, restoring from version control, or reseeding a clean Studio place before normal two-way sync.
+- **How to run:** `azul build [--sync-dir=PATH] [--port=PORT] [--no-warn]` with the plugin connected to the daemon.
 
 ## Configuration
 
@@ -135,7 +142,7 @@ Edit `src/config.ts` to customize:
 - **`deleteOrphansOnConnect`**: Whether to delete unmapped files in the sync directory after a new connection/full snapshot. These files are those that don't correspond to any instance in the DataModel. They could be leftovers from previous syncs or files created manually in the sync directory.
 - **`debugMode`**: Enable or disable debug logging.
 
-Edit `src/plugin/AzulSync.lua` to customize:
+The plugin's settings can be edited from the GUI or by editing `src/plugin/AzulSync.lua`:
 
 - **`WS_URL`**: Port used for communication between the Desktop Daemon and Studio Plugin.
 - **`GUID_ATTRIBUTE`**: Name of the attribute used to store GUIDs.
