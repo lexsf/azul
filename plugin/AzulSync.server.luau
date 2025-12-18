@@ -9,16 +9,16 @@ local ConfigService = game:GetService("ConfigService")
 local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
 local ScriptEditorService = game:GetService("ScriptEditorService")
-local ServerStorage = game:GetService("ServerStorage")
+
+local azulPluginFolder = script.Parent
 
 -- Import WebSocket client
 local WebSocketClient = require(script.Parent.WebSocketClient)
-local CollapsibleTitledSection =
-	require(ServerStorage.AzulCompanionPlugin.StudioWidgets.Components.CollapsibleTitledSection)
-local CustomTextButton = require(ServerStorage.AzulCompanionPlugin.StudioWidgets.Components.CustomTextButton)
-local LabeledCheckbox = require(ServerStorage.AzulCompanionPlugin.StudioWidgets.Components.LabeledCheckbox)
-local LabeledMultiChoice = require(ServerStorage.AzulCompanionPlugin.StudioWidgets.Components.LabeledMultiChoice)
-local LabeledTextInput = require(ServerStorage.AzulCompanionPlugin.StudioWidgets.Components.LabeledTextInput)
+local CollapsibleTitledSection = require(azulPluginFolder.StudioWidgets.Components.CollapsibleTitledSection)
+local CustomTextButton = require(azulPluginFolder.StudioWidgets.Components.CustomTextButton)
+local LabeledCheckbox = require(azulPluginFolder.StudioWidgets.Components.LabeledCheckbox)
+local LabeledMultiChoice = require(azulPluginFolder.StudioWidgets.Components.LabeledMultiChoice)
+local LabeledTextInput = require(azulPluginFolder.StudioWidgets.Components.LabeledTextInput)
 
 local enum = {
 	listType = {
