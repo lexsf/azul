@@ -145,7 +145,7 @@ function WebSocketClient:send(message)
 		return false
 	end
 
-	self:debugPrint("[🐛 WebSocket]: Sending:", string.sub(message, 1, 100))
+	self:debugPrint("[🐛 WebSocket]: Sending:", string.sub(message, 1, 200))
 
 	local success, err = pcall(function()
 		self.client:Send(message)
