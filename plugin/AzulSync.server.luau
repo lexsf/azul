@@ -1086,7 +1086,7 @@ settingsSection:AddChild(createInfoLabel("Name of the attribute used to store Az
 -- Clear Azul GUIDs on exit checkbox
 local clearGuidsCheckbox = LabeledCheckbox.new(
 	"clearGuids", -- name suffix of the gui object
-	"Clear GUIDs", -- the text displayed on the button
+	"Clear GUIDs on Exit", -- the text displayed on the button
 	false -- initial disabled state
 )
 
