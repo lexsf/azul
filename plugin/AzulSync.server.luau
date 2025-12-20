@@ -56,6 +56,8 @@ local CONFIG = {
 
 	DEBUG_MODE = false,
 	SILENT_MODE = false,
+
+	CLEAR_GUIDS_ON_EXIT = true, -- Clear all GUID attributes on disconnect
 }
 
 -- Save settings
@@ -112,6 +114,13 @@ local lastPatchTime = {} -- Track last patch time per GUID to prevent loops
 local recentPatches = {} -- Track which scripts were recently patched from daemon
 local lastInstanceUpdate = {} -- Deduplicate identical rapid instanceUpdated payloads per GUID
 local connections = {}
+
+-- Utility: Clear all GUID attributes
+local function clearAllGUIDAttributes()
+	for instance, _ in pairs(trackedInstances) do
+		instance:SetAttribute(CONFIG.GUID_ATTRIBUTE, nil)
+	end
+end
 
 -- Utility: Check if instance is a script
 local function isScript(instance)
@@ -680,11 +689,18 @@ local function processMessage(message)
 			end
 
 			if existing and existing.ClassName ~= item.className then
-				if isProtectedRobloxContainer(existing) then
-					instance = existing
+				local targetIsScript = isScriptClass(item.className)
+				if targetIsScript then
+					-- For script targets, enforce the correct class (replace unless protected container)
+					if isProtectedRobloxContainer(existing) then
+						instance = existing
+					else
+						existing:Destroy()
+						instance = nil
+					end
 				else
-					existing:Destroy()
-					instance = nil
+					-- For containers, reuse the existing instance even if class differs (e.g., Part instead of Folder)
+					instance = existing
 				end
 			end
 
@@ -1055,6 +1071,22 @@ end)
 guidAttributeLabel:SetMaxGraphemes(50)
 
 settingsSection:AddChild(guidAttributeLabel:GetFrame())
+settingsSection:AddChild(createInfoLabel("Name of the attribute used to store Azul GUIDs on instances."))
+
+-- Clear Azul GUIDs on exit checkbox
+local clearGuidsCheckbox = CustomTextButton.new(
+	"clearGuids", -- name suffix of the gui object
+	"Clear GUIDs on exit", -- the text displayed on the button
+	false -- initial disabled state
+)
+
+settingsSection:AddChild(clearGuidsCheckbox:GetFrame())
+settingsSection:AddChild(
+	createInfoLabel(
+		[[When enabled, all Azul GUID attributes will only exist when the Plugin is connected.<br />
+		Disabling this can improve plugin startup performance, but leaving lingering GUID attributes when publishing your game may cause issues.]]
+	)
+)
 
 -- Heartbeat Interval setting
 local heartbeatIntervalLabel = LabeledTextInput.new(
@@ -1071,6 +1103,7 @@ heartbeatIntervalLabel:SetValueChangedFunction(function(newValue)
 	end
 end)
 settingsSection:AddChild(heartbeatIntervalLabel:GetFrame())
+settingsSection:AddChild(createInfoLabel("Interval in seconds between heartbeat pings to the daemon."))
 
 local listTypeLabel = LabeledMultiChoice.new(
 	"listType", -- name suffix of the gui object
@@ -1093,7 +1126,9 @@ end)
 
 settingsSection:AddChild(listTypeLabel:GetFrame())
 settingsSection:AddChild(
-	createInfoLabel("Whitelist: only services in the list are synced. Blacklist: services in the list are excluded.")
+	createInfoLabel(
+		"Whitelist: only services in the list are synced.<br />Blacklist: services in the list are excluded."
+	)
 )
 
 -- Service List setting
