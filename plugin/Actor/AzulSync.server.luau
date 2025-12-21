@@ -54,6 +54,7 @@ local CONFIG = {
 
 	EXCLUDED_PARENTS = {
 		"ServerStorage.RecPlugins", -- Folder managed by "Eye" plugin. It updates the sourcemap thousands of times. We don't need to track this.
+		"Workspace.Surface Converter Storage", -- Folder managed by "Surface Converter" plugin. We don't need to track it.
 	},
 
 	DEBUG_MODE = false,
@@ -402,16 +403,19 @@ local function shouldSync(instance)
 end
 
 -- Handle script change
-local function onScriptChanged(script)
-	if not shouldSync(script) then
+local function onScriptChanged(changedScript: Script | LocalScript | ModuleScript)
+	if not shouldSync(changedScript) then
 		return
 	end
 
-	local guid = getOrCreateGUID(script)
+	local guid = getOrCreateGUID(changedScript)
 
 	-- Don't send changes if this was just patched from daemon
 	if recentPatches[guid] then
-		debugPrint("[🐛 Azul]: Ignoring change (was just patched from daemon):", script:GetFullName())
+		debugPrint(
+			"[🐛 Azul]: Ignoring change (was just patched from daemon):",
+			`{changedScript.Parent}.{changedScript.Name}`
+		)
 		recentPatches[guid] = nil
 		return
 	end
@@ -425,11 +429,14 @@ local function onScriptChanged(script)
 	local lastPatch = lastPatchTime[guid] or 0
 	local now = tick()
 	if now - lastPatch < 1 then
-		debugPrint("[🐛 Azul]: Ignoring change (too soon after patch):", script:GetFullName())
+		debugPrint(
+			"[🐛 Azul]: Ignoring change (too soon after patch):",
+			`{changedScript.Parent}.{changedScript.Name}`
+		)
 		return
 	end
 
-	local path = getInstancePath(script)
+	local path = getInstancePath(changedScript)
 	if not path then
 		return
 	end
@@ -437,8 +444,8 @@ local function onScriptChanged(script)
 	sendMessage("scriptChanged", {
 		guid = guid,
 		path = path,
-		className = script.ClassName,
-		source = script.Source,
+		className = changedScript.ClassName,
+		source = changedScript.Source,
 	})
 end
 
@@ -597,7 +604,7 @@ local function processMessage(message)
 				applyingPatch = false
 			end)
 
-			infoPrint("[Azul]: Updated script:", instance:GetFullName())
+			infoPrint("[Azul]: Updated script:", `{instance.Parent}.{instance.Name}`)
 
 			-- Refresh the script editor if the script is currently open
 			-- This ensures VSCode changes are visible immediately
