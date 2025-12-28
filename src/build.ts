@@ -42,10 +42,14 @@ export class BuildCommand {
   private async buildSnapshot(): Promise<InstanceData[]> {
     const results: InstanceData[] = [];
     const folderMap = new Map<string, InstanceData>();
+    const scriptPaths = new Set<string>();
+
+    const pathKey = (segments: string[]) => segments.join("/");
 
     const ensureFolder = (segments: string[]) => {
       for (let i = 1; i <= segments.length; i++) {
         const key = segments.slice(0, i).join("/");
+        if (scriptPaths.has(key)) continue; // A script at this path should own children
         if (folderMap.has(key)) continue;
         const data: InstanceData = {
           guid: this.makeGuid(),
@@ -61,18 +65,14 @@ export class BuildCommand {
     const walk = async (dir: string) => {
       const entries = await fs.readdir(dir, { withFileTypes: true });
 
-      for (const entry of entries) {
+      const files = entries.filter((entry) => entry.isFile());
+      const directories = entries.filter((entry) => entry.isDirectory());
+
+      // Process files first so we know which paths are scripts before visiting
+      // their same-named folders (which hold nested children).
+      for (const entry of files) {
         const fullPath = path.join(dir, entry.name);
-        if (entry.isDirectory()) {
-          const relSegments = this.relativeSegments(fullPath);
-          if (relSegments.length > 0) {
-            ensureFolder(relSegments);
-          }
-          await walk(fullPath);
-        } else if (
-          entry.isFile() &&
-          (entry.name.endsWith(".luau") || entry.name.endsWith(".lua"))
-        ) {
+        if (entry.name.endsWith(".luau") || entry.name.endsWith(".lua")) {
           const relSegments = this.relativeSegments(fullPath);
           const { className, scriptName } = this.classifyScript(entry.name);
           const dirSegments = relSegments.slice(0, -1);
@@ -82,6 +82,8 @@ export class BuildCommand {
 
           const filePathSegments = [...dirSegments, scriptName];
           const source = await fs.readFile(fullPath, "utf-8");
+
+          scriptPaths.add(pathKey(filePathSegments));
 
           const fileData: InstanceData = {
             guid: this.makeGuid(),
@@ -93,6 +95,19 @@ export class BuildCommand {
 
           results.push(fileData);
         }
+      }
+
+      // Process directories after scripts so script-named folders are treated
+      // as containers for nested instances rather than sibling Folder nodes.
+      for (const entry of directories) {
+        const fullPath = path.join(dir, entry.name);
+        const relSegments = this.relativeSegments(fullPath);
+
+        if (relSegments.length > 0) {
+          ensureFolder(relSegments);
+        }
+
+        await walk(fullPath);
       }
     };
 
