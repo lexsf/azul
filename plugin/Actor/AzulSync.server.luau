@@ -516,7 +516,11 @@ end
 -- Handle instance removed
 local function onInstanceRemoved(instance)
 	if suppressOutbound then return end
-	if not shouldIncludeInSnapshot(instance) then return end
+
+	if not trackedInstances[instance] then
+		-- debugPrint(`[🐛 Azul]: Instance is excluded: {instance.Parent}.{instance.Name}`)
+		return
+	end
 
 	local guid = trackedInstances[instance]
 
