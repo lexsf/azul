@@ -35,18 +35,25 @@ export class SourcemapGenerator {
     allNodes: Map<string, TreeNode>,
     fileMappings: Map<string, FileMapping>,
     outputPath: string,
-    oldPath?: string[]
+    oldPath?: string[],
+    isNew?: boolean
   ): void {
     try {
       const sourcemap = this.readOrCreateRoot(outputPath);
 
       // If the node moved/renamed, prune the previous location
       if (oldPath && !this.pathsMatch(oldPath, node.path)) {
-        this.removePath(sourcemap, oldPath);
+        this.removePath(sourcemap, oldPath, node.className);
       }
 
       const newSubtree = this.buildNodeFromTree(node, fileMappings);
-      this.insertNodeAtPath(sourcemap, newSubtree, node.path, allNodes);
+      this.insertNodeAtPath(
+        sourcemap,
+        newSubtree,
+        node.path,
+        allNodes,
+        Boolean(isNew)
+      );
       this.write(sourcemap, outputPath);
     } catch (error) {
       log.warn("Incremental sourcemap update failed, regenerating:", error);
@@ -263,7 +270,8 @@ export class SourcemapGenerator {
     root: SourcemapRoot,
     newNode: SourcemapNode,
     pathSegments: string[],
-    allNodes: Map<string, TreeNode>
+    allNodes: Map<string, TreeNode>,
+    isNewEntry: boolean
   ): void {
     if (pathSegments.length === 0) return;
 
@@ -274,10 +282,19 @@ export class SourcemapGenerator {
       let existingIndex = currentChildren.findIndex((n) => n.name === segment);
 
       if (i === pathSegments.length - 1) {
-        if (existingIndex !== -1) {
-          currentChildren.splice(existingIndex, 1, newNode);
-        } else {
+        if (isNewEntry) {
+          // Appending preserves siblings with identical names/classes from being merged
           currentChildren.push(newNode);
+        } else {
+          existingIndex = currentChildren.findIndex(
+            (n) => n.name === segment && n.className === newNode.className
+          );
+
+          if (existingIndex !== -1) {
+            currentChildren.splice(existingIndex, 1, newNode);
+          } else {
+            currentChildren.push(newNode);
+          }
         }
         return;
       }
@@ -338,7 +355,8 @@ export class SourcemapGenerator {
     pathSegments: string[],
     outputPath: string,
     nodes: Map<string, TreeNode>,
-    fileMappings: Map<string, FileMapping>
+    fileMappings: Map<string, FileMapping>,
+    targetClassName?: string
   ): boolean {
     try {
       if (!fs.existsSync(outputPath)) {
@@ -349,7 +367,7 @@ export class SourcemapGenerator {
       const raw = fs.readFileSync(outputPath, "utf-8");
       const json = JSON.parse(raw) as SourcemapRoot;
 
-      const removed = this.removePath(json, pathSegments);
+      const removed = this.removePath(json, pathSegments, targetClassName);
       if (removed) {
         this.write(json, outputPath);
       }
@@ -364,7 +382,11 @@ export class SourcemapGenerator {
   /**
    * Remove node matching path; prune empty parents.
    */
-  private removePath(root: SourcemapRoot, pathSegments: string[]): boolean {
+  private removePath(
+    root: SourcemapRoot,
+    pathSegments: string[],
+    targetClassName?: string
+  ): boolean {
     if (pathSegments.length === 0) return false;
 
     const pruneRecursive = (
@@ -373,7 +395,19 @@ export class SourcemapGenerator {
     ): boolean => {
       if (!nodes) return false;
       const name = pathSegments[idx];
-      const nodeIndex = nodes.findIndex((n) => n.name === name);
+      let nodeIndex = nodes.findIndex((n) => {
+        if (n.name !== name) return false;
+        if (idx === pathSegments.length - 1 && targetClassName) {
+          return n.className === targetClassName;
+        }
+        return true;
+      });
+
+      // Fallback to name-only match so we still prune even if class drifted
+      if (nodeIndex === -1 && idx === pathSegments.length - 1) {
+        nodeIndex = nodes.findIndex((n) => n.name === name);
+      }
+
       if (nodeIndex === -1) return false;
 
       const node = nodes[nodeIndex];

@@ -161,7 +161,9 @@ export class SyncDaemon {
         node,
         this.tree.getAllNodes(),
         this.fileWriter.getAllMappings(),
-        config.sourcemapPath
+        config.sourcemapPath,
+        undefined,
+        false
       );
     }
   }
@@ -207,7 +209,8 @@ export class SyncDaemon {
         this.tree.getAllNodes(),
         this.fileWriter.getAllMappings(),
         config.sourcemapPath,
-        update.prevPath
+        update.prevPath,
+        update.isNew
       );
     }
 
@@ -262,7 +265,8 @@ export class SyncDaemon {
       pathSegments,
       outputPath,
       this.tree.getAllNodes(),
-      this.fileWriter.getAllMappings()
+      this.fileWriter.getAllMappings(),
+      node.className
     );
 
     // If prune failed to find the path (e.g., sourcemap drift), rebuild once to stay consistent
