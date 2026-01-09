@@ -65,7 +65,7 @@ local PUSH_CONFIG_PATH = {
 	"ServerStorage",
 	"Azul",
 	"Config",
-}
+} -- Maps to ServerStorage.Azul.Config (ModuleScript)
 
 local SETTINGS_SCOPE = enum.scope.GLOBAL -- or "project"
 local SETTINGS_KEY = "AZUL_SETTINGS"
@@ -693,7 +693,7 @@ end
 local function sendPushConfig()
 	local configPayload, err = readPushConfig()
 	if not configPayload then
-		debugPrint(`[🐛 Azul]: push config unavailable: {err}`)
+		warn(`[Azul]: push config unavailable: {err}`)
 		return false
 	end
 

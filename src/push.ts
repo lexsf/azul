@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 import { IPCServer } from "./ipc/server.js";
 import { config } from "./config.js";
@@ -42,8 +43,21 @@ export class PushCommand {
     const snapshotMappings: PushSnapshotMapping[] = [];
 
     for (const mapping of mappings) {
-      const sourceDir = path.resolve(mapping.source);
       const destSegments = mapping.destination;
+
+      const sourceCandidates = this.expandSourceCandidates(mapping.source);
+      const sourceDir = sourceCandidates.find((candidate) =>
+        fs.existsSync(candidate)
+      );
+
+      if (!sourceDir) {
+        log.error(
+          `Source path not found for push mapping. Tried: ${sourceCandidates.join(
+            ", "
+          )}`
+        );
+        continue;
+      }
 
       const builder = new SnapshotBuilder({
         sourceDir,
@@ -63,6 +77,11 @@ export class PushCommand {
         destructive: Boolean(mapping.destructive),
         instances,
       });
+    }
+
+    if (snapshotMappings.length === 0) {
+      log.error("No push mappings could be prepared (missing source paths).");
+      return;
     }
 
     await new Promise<void>((resolve) => {
@@ -106,7 +125,9 @@ export class PushCommand {
       return null;
     }
 
-    log.info("Waiting for push config from Studio (place ModuleScript)...");
+    log.info(
+      "Waiting for push config from Studio (ServerStorage.Azul.Config)..."
+    );
     const config = await this.waitForPushConfig();
     if (!config) {
       return null;
@@ -133,6 +154,37 @@ export class PushCommand {
       .split(/[./\\]+/)
       .map((segment) => segment.trim())
       .filter(Boolean);
+  }
+
+  /**
+   * Normalize source path strings from config, preferring the raw value but
+   * attempting obvious fixes (e.g., accidental leading '.' before a folder).
+   */
+  private expandSourceCandidates(source: string): string[] {
+    const candidates: string[] = [];
+    const cwd = process.cwd();
+
+    const add = (p: string) => {
+      const abs = path.resolve(cwd, p);
+      if (!candidates.includes(abs)) {
+        candidates.push(abs);
+      }
+    };
+
+    add(source);
+
+    // If someone wrote ".Packages" by mistake, try "Packages"
+    if (source.startsWith(".")) {
+      const trimmedDot = source.replace(/^\.*/, "");
+      if (trimmedDot) add(trimmedDot);
+    }
+
+    // If someone prefixed with ./ or .\, resolve both forms
+    if (source.startsWith("./") || source.startsWith(".\\")) {
+      add(source.slice(2));
+    }
+
+    return candidates;
   }
 
   private async waitForPushConfig(): Promise<PushConfig | null> {
