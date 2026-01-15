@@ -48,7 +48,6 @@ export class RojoSnapshotBuilder {
 
     if (!hasChildren && rootPath) {
       const absRoot = path.resolve(projectDir, rootPath);
-      this.ensureFolder([...this.destPrefix], results);
       await this.walkDirectory(
         absRoot,
         [...this.destPrefix],
@@ -227,21 +226,30 @@ export class RojoSnapshotBuilder {
   ): Promise<void> {
     if (this.isIgnored(dirPath)) return;
 
-    // If this directory has an init, treat it as a ModuleScript container
-    const initScript = await this.findInit(dirPath);
-    if (initScript) {
+    const entries = await fs.readdir(dirPath, { withFileTypes: true });
+    const initCandidates = this.initCandidatesFor();
+
+    // If this directory has an init, the directory becomes that script; children attach under it
+    const initEntry = entries.find(
+      (e) => e.isFile() && initCandidates.includes(e.name)
+    );
+
+    if (initEntry) {
       const key = destPath.join("/");
-      // Avoid duplicating ModuleScripts when already emitted from tree walk
       if (!this.moduleContainers.has(key)) {
         this.moduleContainers.add(key);
         this.ensureFolder(destPath.slice(0, -1), results);
-        const scriptClass = this.classifyScript(initScript.fileName).className;
+        const scriptClass = this.classifyScript(initEntry.name).className;
+        const source = await fs.readFile(
+          path.join(dirPath, initEntry.name),
+          "utf-8"
+        );
         results.push({
           guid: this.makeGuid(),
           className: scriptClass,
           name: destPath[destPath.length - 1] ?? path.basename(dirPath),
           path: [...destPath],
-          source: initScript.source,
+          source,
         });
       }
     } else {
@@ -263,9 +271,6 @@ export class RojoSnapshotBuilder {
       this.ignoreMatchers = previousIgnore;
       return;
     }
-
-    const entries = await fs.readdir(dirPath, { withFileTypes: true });
-    const initCandidates = this.initCandidatesFor();
 
     for (const entry of entries) {
       const fullPath = path.join(dirPath, entry.name);

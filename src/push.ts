@@ -420,11 +420,50 @@ export class PushCommand {
 
       entries.sort((a, b) => a.name.localeCompare(b.name));
 
+      // If this directory has an init-like file, treat the directory itself as that script
+      const initCandidates = [
+        "init.lua",
+        "init.luau",
+        "init.server.lua",
+        "init.server.luau",
+        "init.client.lua",
+        "init.client.luau",
+        "init.module.lua",
+        "init.module.luau",
+      ];
+
+      const initEntry = entries.find(
+        (e) => e.isFile() && initCandidates.includes(e.name)
+      );
+
+      if (initEntry) {
+        const full = path.join(dir, initEntry.name);
+        const { className } = this.classifyScript(initEntry.name);
+        const destPath = [...destSegments, ...relSegments];
+        const key = destPath.join("/");
+        if (!emittedPaths.has(key)) {
+          this.ensureFolder(destPath.slice(0, -1), results, emittedFolders);
+          emittedPaths.add(key);
+          emittedFolders.add(key); // prevent folder emission at this path
+          results.push({
+            guid: generateGUID(),
+            className,
+            name: destPath[destPath.length - 1] ?? path.basename(dir),
+            path: destPath,
+            source: await fsp.readFile(full, "utf-8"),
+          });
+        }
+      }
+
       for (const entry of entries) {
         const full = path.join(dir, entry.name);
         if (entry.isDirectory()) {
           await walk(full, [...relSegments, entry.name]);
           continue;
+        }
+
+        if (initEntry && initEntry.name === entry.name) {
+          continue; // already emitted as the container
         }
 
         if (!this.isScriptFile(entry.name)) continue;

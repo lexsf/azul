@@ -4,6 +4,7 @@ import { config } from "./config.js";
 import { log } from "./util/log.js";
 import { SnapshotBuilder } from "./snapshot.js";
 import { RojoSnapshotBuilder } from "./snapshot/rojo.js";
+import type { InstanceData } from "./ipc/messages.js";
 
 interface BuildOptions {
   syncDir?: string;
