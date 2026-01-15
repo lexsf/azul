@@ -115,12 +115,15 @@ Push-Location $repoRoot
 try {
     Write-Output "Installing dependencies (npm i)..."
     npm i
+    if ($LASTEXITCODE -ne 0) { throw "Failed to install build dependencies." }
 
     Write-Output "Building Azul (npm run build)..."
     npm run build
+    if ($LASTEXITCODE -ne 0) { throw "Build failed! check above for more information." }
 
     Write-Output "Installing Azul globally (npm install -g .)..."
     npm install -g .
+    if ($LASTEXITCODE -ne 0) { throw "Failed to install Azul globally." }
 } catch {
     Write-Error "Installation failed: $_"
     exit 1
