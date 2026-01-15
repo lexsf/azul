@@ -134,4 +134,4 @@ try {
 Write-Output "Azul installation complete!"
 Write-Output "Try running 'azul --help' to get started."
 Write-Output "If you want to update Azul later, pull the latest version and run this install script again."
-Read-Host "(Press Enter to exit)"
+if (-not $Force) { Read-Host "(Press Enter to exit)" }
