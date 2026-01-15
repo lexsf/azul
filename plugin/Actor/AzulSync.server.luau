@@ -650,16 +650,8 @@ local function findPushConfigModule(): ModuleScript?
 	return nil
 end
 
--- Read and validate push config from ModuleScript
-local function readPushConfig()
-	local module = findPushConfigModule()
-	if not module then return nil, "Push config ModuleScript not found" end
-
-	local ok, data = pcall(require, module)
-	if not ok then return nil, `Failed to require push config: {data}` end
-
-	if type(data) ~= "table" then return nil, "Push config is not a table" end
-
+-- Validate the push config format
+local function validateConfig(data: any)
 	local mappings = {}
 	if type(data.pushMappings) == "table" then
 		for _, entry in ipairs(data.pushMappings) do
@@ -687,7 +679,52 @@ local function readPushConfig()
 		deleteOrphansOnConnect = data.deleteOrphansOnConnect,
 	}
 
-	return configPayload, nil
+	return configPayload
+end
+
+-- Read and validate push config from ModuleScript (legacy)
+local function readPushConfigLegacy(module: ModuleScript?)
+	module = module or findPushConfigModule()
+	if not module then return nil, "Push config ModuleScript not found" end
+
+	local ok, data = pcall(require, module)
+	if not ok then return nil, `Failed to require push config: {data}` end
+
+	if type(data) ~= "table" then return nil, "Push config is not a table" end
+	
+	return validateConfig(data), nil
+end
+
+-- Read and validate push config from ModuleScript (uses the new JSON-based format)
+local function readPushConfig()
+	local module = findPushConfigModule()
+	if not module then return nil, "Push config ModuleScript not found" end
+	
+	-- read and parse json
+	local contents = module.Source
+	-- try to parse
+	local ok, data = pcall(function(contents)
+		contents = string.match(contents, "%-%-%[%[(.-)%]%]") -- get the contents between the --[[ and ]] delimiters
+		local parsed = HttpService:JSONDecode(contents)
+		
+		return parsed
+	end, contents)
+	
+	
+	if not ok then
+		-- could not parse as json, could be legacy format
+		infoPrint(`[Azul]: Automatically migrated push config.`)
+		
+		local data = readPushConfigLegacy(module) -- parse as legacy first
+		
+		-- then migrate
+		local content = HttpService:JSONEncode(data)
+		module.Source = "--[[\n" .. content .. "\n]]\nreturn nil"
+		
+		return data, nil
+	end
+	
+	return validateConfig(data), nil
 end
 
 local function sendPushConfig()
